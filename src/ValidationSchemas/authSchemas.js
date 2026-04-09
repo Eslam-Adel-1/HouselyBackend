@@ -20,3 +20,22 @@ export const loginSchema = joi.object({
   password: joi.string().min(8).max(100).required(),
 });
 
+// forgot password schema
+
+export const forgotPasswordSchema = joi.object({
+  identifier: joi
+    .alternatives()
+    .try(joi.string().email(), joi.string().pattern(new RegExp("^[0-9]{11}$")))
+    .required(), // email or phone
+});
+
+// reset password schema
+
+export const resetPasswordSchema = joi.object({
+  identifier: joi
+    .alternatives()
+    .try(joi.string().email(), joi.string().pattern(new RegExp("^[0-9]{11}$")))
+    .required(),
+  code: joi.string().length(6).required(),
+  newPassword: joi.string().min(8).max(100).required(),
+});
