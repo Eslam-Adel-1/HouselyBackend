@@ -1,11 +1,10 @@
 import User from "../models/userModel.js";
-import { hashPassword } from "../utils/passwordUtils.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 import { generateToken } from "../utils/jwtUtils.js";
 import { sendVerificationEmail } from "../utils/emailUtils.js";
-import { registerSchema } from "../ValidationSchemas/authSchemas.js";
 import {
   registerSchema,
+  loginSchema,
 } from "../ValidationSchemas/authSchemas.js";
 
 //================================================
@@ -114,3 +113,61 @@ export const verifyAccount = async (req, res) => {
   }
 };
 
+//================================================
+
+// login api
+
+export const login = async (req, res) => {
+  try {
+    // Validate request
+    const { error } = loginSchema.validate(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .json({ success: false, message: error.details[0].message });
+    }
+
+    const { identifier, password } = req.body;
+
+    // Find user by email OR phone
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { phone: identifier }],
+    }).select("+password");
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    }
+
+    // Compare password using bcrypt
+    const isMatch = await comparePassword(password, user.password);
+
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    }
+
+    // Check verification
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Account not verified. Please check your email for the verification code.",
+      });
+    }
+
+    // Remove password from response
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    res.status(200).json({
+      success: true,
+      token: generateToken(user._id),
+      data: userObj,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
