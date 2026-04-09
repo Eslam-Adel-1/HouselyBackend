@@ -1,8 +1,12 @@
 import User from "../models/userModel.js";
 import { hashPassword } from "../utils/passwordUtils.js";
+import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 import { generateToken } from "../utils/jwtUtils.js";
 import { sendVerificationEmail } from "../utils/emailUtils.js";
 import { registerSchema } from "../ValidationSchemas/authSchemas.js";
+import {
+  registerSchema,
+} from "../ValidationSchemas/authSchemas.js";
 
 //================================================
 
@@ -70,3 +74,43 @@ export const register = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+//================================================
+
+export const verifyAccount = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide email and verification code",
+      });
+    }
+
+    const user = await User.findOne({
+      email,
+      verificationCode: code,
+      verificationCodeExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired verification code",
+      });
+    }
+
+    user.isVerified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpire = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Account verified successfully! You can now log in.",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
