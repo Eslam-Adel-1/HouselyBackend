@@ -175,6 +175,40 @@ export const verifyAccount = async (req, res) => {
   }
 };
 
+// verify reset code
+export const verifyResetCode = async (req, res) => {
+  try {
+    const { identifier, code } = req.body;
+
+    if (!identifier || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide identifier and verification code",
+      });
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { phone: identifier }],
+      resetPasswordCode: code,
+      resetPasswordCodeExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset code",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Code verified successfully! You can now reset your password.",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 //================================================
 
 // forgot password api
@@ -263,6 +297,63 @@ export const resetPassword = async (req, res) => {
       success: true,
       message: "Password reset successfully! You can now log in.",
     });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// resend code api
+export const resendCode = async (req, res) => {
+  try {
+    const { identifier, mode } = req.body; // mode: 'register' or 'reset'
+
+    if (!identifier || !mode) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide identifier and mode",
+      });
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { phone: identifier }],
+    });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // Generate new code
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expireTime = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    if (mode === "register") {
+      user.verificationCode = newCode;
+      user.verificationCodeExpire = expireTime;
+    } else if (mode === "reset") {
+      user.resetPasswordCode = newCode;
+      user.resetPasswordCodeExpire = expireTime;
+    } else {
+      return res.status(400).json({ success: false, message: "Invalid mode" });
+    }
+
+    await user.save();
+
+    // Send via email if available
+    if (user.email) {
+      await sendVerificationEmail(user.email, newCode, user.name);
+      return res
+        .status(200)
+        .json({ success: true, message: "Code resent to your email" });
+    } else {
+      // SMS simulation
+      console.log(`[SIMULATED SMS] New Code for ${user.phone}: ${newCode}`);
+      return res.status(200).json({
+        success: true,
+        message: "Code resent to your phone number (Simulated)",
+      });
+    }
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
