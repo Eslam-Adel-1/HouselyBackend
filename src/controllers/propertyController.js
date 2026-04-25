@@ -1,4 +1,5 @@
 import Property from "../models/propertyModel.js";
+import Favorite from "../models/favoriteModel.js";
 import "../models/reviewModel.js";
 import "../models/userModel.js";
 
@@ -195,6 +196,87 @@ export const getPropertyById = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: property,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//================================================
+
+export const getFavoriteProperties = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const favoriteProperties = await Favorite.findOne({
+      user: userId,
+    }).populate(
+      "properties",
+      "name images rentPerMonth address averageRating ratingCount",
+    );
+
+    if (!favoriteProperties || !favoriteProperties.properties.length) {
+      return res.status(200).json({
+        success: true,
+        message: "No favorite properties found",
+        data: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: favoriteProperties,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//================================================
+
+export const addFavoriteProperty = async (req, res) => {
+  try {
+    const { id: propertyId } = req.body;
+    const userId = req.user._id;
+    const favoriteProperties = await Favorite.findOne({ user: userId });
+    const property = await Property.findById(propertyId);
+
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found",
+      });
+    }
+
+    if (!favoriteProperties) {
+      await Favorite.create({ user: userId, properties: [propertyId] });
+      return res.status(200).json({
+        success: true,
+        message: "Property added to favorites",
+      });
+    }
+
+    if (favoriteProperties.properties.includes(propertyId)) {
+      favoriteProperties.properties.pull(propertyId);
+      await favoriteProperties.save();
+      return res.status(200).json({
+        success: true,
+        message: "Property removed from favorites",
+      });
+    }
+
+    favoriteProperties.properties.push(propertyId);
+    await favoriteProperties.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Property added to favorites",
     });
   } catch (error) {
     return res.status(500).json({
