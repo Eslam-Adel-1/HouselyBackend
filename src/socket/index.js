@@ -3,6 +3,7 @@ import Conversation from "../models/conversationModel.js";
 import Message from "../models/messageModel.js";
 import User from "../models/userModel.js";
 import { verifyToken } from "../utils/jwtUtils.js";
+import { cloudinary } from "../config/cloudinary.js";
 
 //======================================================
 let io;
@@ -58,9 +59,35 @@ export const initSocket = (server) => {
 
     // Handle sending messages
     socket.on("send_message", async (data) => {
-      const { conversationId, sender, receiver, message, image, video } = data;
+      let { conversationId, sender, receiver, message, image, video, tempId } = data;
 
       try {
+        // If there's an image or video, handle uploading
+        if (image || video) {
+          // Notify the room that a media file is being uploaded (Loading Indicator)
+          io.to(conversationId).emit("upload_status", {
+            conversationId,
+            tempId,
+            status: "uploading",
+          });
+
+          if (image && image.startsWith("data:")) {
+            const uploadResponse = await cloudinary.uploader.upload(image, {
+              folder: "housely/chat",
+              resource_type: "image",
+            });
+            image = uploadResponse.secure_url;
+          }
+
+          if (video && video.startsWith("data:")) {
+            const uploadResponse = await cloudinary.uploader.upload(video, {
+              folder: "housely/chat",
+              resource_type: "video",
+            });
+            video = uploadResponse.secure_url;
+          }
+        }
+
         // Save message to DB
         const newMessage = await Message.create({
           conversationId,
