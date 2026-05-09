@@ -103,8 +103,11 @@ export const initSocket = (server) => {
           lastMessage: newMessage._id,
         });
 
-        // Emit to the conversation room
-        io.to(conversationId).emit("receive_message", newMessage);
+        // Emit to the conversation room (including the sender to confirm save)
+        io.to(conversationId).emit("receive_message", {
+          ...newMessage._doc,
+          tempId, // Send back tempId so client can replace loading state
+        });
 
         console.log(`Message sent in room ${conversationId}`);
       } catch (error) {
