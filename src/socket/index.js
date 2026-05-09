@@ -16,6 +16,7 @@ export const initSocket = (server) => {
       origin: "*", // Adjust for production
       methods: ["GET", "POST"],
     },
+    maxHttpBufferSize: 1e8, // 100 MB buffer size for large video base64 payloads
   });
 
   //==================================
